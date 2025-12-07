@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import math
-from nms import non_maximal_suppression
+from nms import non_maximal_suppression, has_overlap
 
 def get_mask(frame1, frame2, kernel=np.ones((3, 3), dtype=np.uint8)):
     #Grayscale Conversion
@@ -33,7 +33,36 @@ def contour_custom_draw(mask, original_frame):
             
     return copy
 
+def get_valid_contours(mask, extended_roi):
+    """
+    Docstring for get_valid_contours
+    
+    :param mask: binary motion mask
+    :param extended_roi: [x1, y1, x2, y2]
+    => list of [x, y, w, h] detects (not rounded to int)
+    """
+    valid_detects = []
+    contours, heirarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours:
+        x, y, w, h = cv2.boundingRect(cnt)
+        if has_overlap([x, y, w, h], [extended_roi[0], extended_roi[1], (extended_roi[2] - extended_roi[0]), (extended_roi[3] - extended_roi[1])]):
+            x, y, w, h = int(x), int(y), int(w), int(h), 
+            valid_detects.append([x, y, w, h])
 
+    return valid_detects            
+        
+def reformat(cv2detect):
+    """
+    Docstring for reformat
+    
+    :param cv2detect: [x, y, w, h]
+    => [x1, y1, x2, y2]
+    """
+    return [cv2detect[0], cv2detect[1], cv2detect[0] +cv2detect[2], cv2detect[1] + cv2detect[3]]
+
+def update_roi(roi, velocity):
+    roi[0], roi[2] = roi[0] + velocity[0], roi[2] + velocity[0]
+    roi[1], roi[3] = roi[1] + velocity[1], roi[3] + velocity[1]
 
 def contour_draw_rect(mask, original_frame):
     copy = original_frame.copy()

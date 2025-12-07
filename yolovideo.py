@@ -1,6 +1,6 @@
 import cv2
 from ultralytics import YOLO
-from functions import get_mask
+from functions import get_mask, get_valid_contours, reformat, update_roi
 import numpy as np
 
 model = YOLO("runs/detect/train3/weights/best.pt")
@@ -11,11 +11,21 @@ if not cap.isOpened():
     print("Error, can't open video file")
 else:
     print("Video opened successfully")
+    
+    
+    
+#State Variables
+framenum = 0
 frames = []
+detects = []
+velocity = [] #initial state velocity
+
 while True:
-    # Capture frame-by-frame
+    if len(velocity) != 0:
+        update_roi(extended_roi, velocity)
+    
+    framenum += 1
     ret, frame = cap.read()
-    #Modify the background?
     frames.append(frame)
     if len(frames) > 2:
         frames = frames[1:]
@@ -34,10 +44,31 @@ while True:
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2), 
                 mask_roi = mask[y1:y2, x1:x2]
                 if np.any(mask_roi != 0):
-                
+                    
+                    #Everytime yolo detects we update it as first_detect
+                    detects = [[x1, y1, x2, y2, framenum]]
+                    extended_roi = [int(x1) - 20, int(y1) - 20, int(x2) + 20, int(y2) + 20] #declared the first time we get a first-detect
+                    
                     cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
                     cv2.rectangle(frame, (int(x1) - 20, int(y1) - 20), (int(x2) + 20, int(y2) + 20), (0, 0, 255), 1)
-
+            # The next frame when YOLO fails to detect
+            if len(r.boxes) == 0 and len(detects) != 0:
+                contours = get_valid_contours(mask, extended_roi)
+                #Right now stick with this so we get one detection, can think of more robust ways in the future
+                if len(contours) == 1:
+                    current_detect = reformat(contours[0])
+                    current_detect.append(framenum)
+                    detects.append(current_detect)
+                    if len(detects) > 2:
+                        detects = detects[1:]
+                    velocity = [(detects[1][0] - detects[0][0]) / (detects[1][4] - detects[0][4]), (detects[1][1] - detects[0][1]) / (detects[1][4] - detects[0][4])] # [vx, vy]
+                    cv2.rectangle(frame, (int(current_detect[0]), int(current_detect[1])), (int(current_detect[2]), int(current_detect[3])), (255, 0, 0), 2)
+                elif len(contours) == 0:
+                    # Resets when there is no detections
+                    detects = []
+                    velocity = []
+                    
+                
 
 
         # Display the resulting frame
