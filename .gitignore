@@ -6,3 +6,5 @@
 /outputimg/
 /yolo_dataset/
 /justin_serve_game/
+*.mp4
+*.MPG
