@@ -39,15 +39,14 @@ def get_valid_contours(mask, extended_roi):
     
     :param mask: binary motion mask
     :param extended_roi: [x1, y1, x2, y2]
-    => list of [x, y, w, h] detects (not rounded to int)
+    => list of [x1, y1, x2, y2] detects (not rounded to int)
     """
     valid_detects = []
     contours, heirarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for cnt in contours:
-        x, y, w, h = cv2.boundingRect(cnt)
-        if has_overlap([x, y, w, h], [extended_roi[0], extended_roi[1], (extended_roi[2] - extended_roi[0]), (extended_roi[3] - extended_roi[1])]):
-            x, y, w, h = int(x), int(y), int(w), int(h), 
-            valid_detects.append([x, y, w, h])
+        (x, y), r = cv2.minEnclosingCircle(cnt)
+        if x >= extended_roi[0] and x <= extended_roi[2] and y >= extended_roi[1] and y <= extended_roi[3]:
+            valid_detects.append([x-r, y-r, x+r, y+r])
 
     return valid_detects            
         
